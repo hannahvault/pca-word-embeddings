@@ -492,10 +492,10 @@ for line in task_words:
     else:#wrong
         wrong_ex.append((wd1, wd2, wd3, wd4, pred))
 
-print("\nCorrect examples (top 5):")
+print("\nCorrect examples (first 5):")
 for ex in correct_ex[:5]:
     print(f"  {ex[0]}:{ex[1]} :: {ex[2]}:{ex[3]} → {ex[4]}")
 
-print("\nWrong examples (top 5):")
+print("\nWrong examples (first 5):")
 for ex in wrong_ex[:5]:
     print(f"  {ex[0]}:{ex[1]} :: {ex[2]}:{ex[3]} → {ex[4]}")
