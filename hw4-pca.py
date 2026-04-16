@@ -99,7 +99,8 @@ def find_embedding(word, words, E):
   # i) Find the index/position of 'word' in 'words'.
   # ii) The row of 'E' at this index will be the embedding 'emb'. 
   ##################################################################
-  
+  idx = np.where(words == word)[0][0]
+  emb = E[idx]
   return emb
 
 
@@ -123,7 +124,13 @@ def find_most_sim_word(word, words, E):
   # embedding of 'word' from the search (for this, you will need to find the index/position of 'word' in 'words'). 
   # iv) Find the word corresponding to that index from 'words'.
   ###############################################################################################################
-    
+  emb = find_embedding(word, words, E) #(100,)
+  sims = E@emb #(10000,) # cosine similarity = dot product (rows of E already have unit norm)
+
+  idx = np.where(words==word)[0][0] #arr, first index
+  sims[idx] = -np.inf # exclude itself
+
+  most_sim_word = words[np.argmax(sims)]
   return most_sim_word
 
 
@@ -146,7 +153,9 @@ def find_info_ev(v, words, k=20):
   # i) Obtain a set of indices (postions in 'v') which would sort the entries of 'v' in decreasing order of absolute value.
   # ii) Using the set of first 'k' indices, get the corresponding words from the list 'words'.
   ##########################################################################################################################
-
+  # sort decreasing order abs value
+  idx = np.argsort(np.abs(v))[::-1]
+  info = words[idx[:k]] # select top-k
   return info
 
 
@@ -218,7 +227,13 @@ def get_projections(word_seq, words, E, w):
   #     - Find the projection of this embedding onto 'w', i.e. the dot product with normalized 'w'. 
   # ii) Return the set of projections. 
   ###############################################################################################################  
-  
+  w_norm = w / np.linalg.norm(w)          # unit vector
+  proj_seq = []
+  for word in word_seq:
+      emb = find_embedding(word, words, E)
+      proj = np.dot(emb, w_norm)
+      proj_seq.append(proj)
+  proj_seq = np.array(proj_seq) 
   return proj_seq
     
 
@@ -244,7 +259,11 @@ def find_most_sim_word_w(w, words, E, ids):
   # ii) Find the index of the row of 'E' which gives the largest similarity, exculding the rows at indices given by 'ids' from the search. 
   # iii) Find the word corresponding to that index from 'words'.
   #########################################################################################################################################
-    
+  sims = E @ w # dot products (E rows have unit norm, w is unit)
+  for i in ids:
+      sims[i] = -np.inf  # exclude given words
+  idx = np.argmax(sims)
+  most_sim_word = words[idx]      
   return most_sim_word
 
   
@@ -266,7 +285,19 @@ def find_analog(wd1, wd2, wd3, words, E):
   # iv) Find wd4, the closest word to w (excluding the given three words from the search by using the indices from the previous step), 
   # using the 'find_most_sim_word_w' function. This will be the answer to the analogy question.
   #########################################################################################################################################
-  
+  w1 = find_embedding(wd1, words, E)
+  w2 = find_embedding(wd2, words, E)
+  w3 = find_embedding(wd3, words, E)
+
+  w = w2 - w1 + w3
+  w = w / np.linalg.norm(w) 
+
+  id1 = np.where(words == wd1)[0][0]
+  id2 = np.where(words == wd2)[0][0]
+  id3 = np.where(words == wd3)[0][0]
+  ids = [id1, id2, id3]
+
+  wd4 = find_most_sim_word_w(w, words, E, ids)  
   return wd4
 
 
@@ -304,10 +335,10 @@ def check_analogy_task_acc(task_words, words, E):
 # M: The co-occurrance matrix
 # words: The set of all words in 'dictionary.txt'
 # task_words: The set of analogy queries from 'analogy_task.txt' (for the BONUS part)
-M = read_csv("hw4/co_occur.csv")
-words = read_txt("hw4/dictionary.txt")
+M = read_csv("hw4/co_occur.csv")#(10000,10000)
+words = read_txt("hw4/dictionary.txt")#10000
 words = np.array(words)
-task_words = read_txt('hw4/analogy_task.txt')
+task_words = read_txt('hw4/analogy_task.txt') #5585
 
 
 ###########################################################
@@ -321,7 +352,23 @@ task_words = read_txt('hw4/analogy_task.txt')
 # the documentation available at: https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.PCA.html).
 # iv) Get the set of eigenvalues and obtain the plot using the 'plot_evs' function provided above.
 
+# i) log transformation
+M_tilde = np.log(1 + M)
 
+# ii) centering
+mean_vec = np.mean(M_tilde, axis=0) # (d,) (10000,)
+Mc = M_tilde - mean_vec # (n, d) (10000,10000)
+
+# iii) PCA
+pca = PCA(n_components=100)
+pca.fit(Mc)
+
+# iv) eigenvalues 
+eigenvalues = pca.explained_variance_
+
+# plot
+plot_evs(eigenvalues)
+print("Variance explained by first 100 eigenvalues: ", np.sum(pca.explained_variance_ratio_))
 
 ##########################################################
 # Part 2: Finding the word most similar to a given word #
@@ -333,7 +380,23 @@ task_words = read_txt('hw4/analogy_task.txt')
 # iii) Normalize the rows of E to have unit l2-norm.
 # iv) Complete the 'find_embedding' function and the 'find_most_sim_word' function. 
 # v) Pick some word(s), e.g. 'university', uqertyse the 'find_most_sim_word' function to find the most similar word.
+V = pca.components_.T   # (10000, 100)
 
+# ii) P = Mc @ V,  then normalize columns of P
+P = Mc @ V
+col_norms = np.linalg.norm(P, axis=0, keepdims=True)   # (1, 100)
+col_norms[col_norms == 0] = 1
+E = P / col_norms              # normalize each column (PC direction)
+
+# iii) Normalize rows of E to unit l2-norm
+row_norms = np.linalg.norm(E, axis=1, keepdims=True)
+row_norms[row_norms == 0] = 1
+E_hat = E / row_norms          # (10000, 100)  — final embedding matrix
+
+# iv-v) Find similar words
+for query in ['learning', 'university', 'california']:
+    sim = find_most_sim_word(query, words, E_hat)
+    print(f"Most similar to '{query}': {sim}")
 
 
 #########################################################################################
@@ -344,7 +407,18 @@ task_words = read_txt('hw4/analogy_task.txt')
 # elements of a given eigenvector.
 # ii) Choose a set of eigenvectors (i.e. columns) from V.
 # iii) For each eigenvector, use the 'find_info_ev' function to see what kind of information it captures. Print the results.
+print("\n--- Eigenvector interpretation ---")
+for i in [0, 1, 2, 3, 4]:   # first 5 eigenvectors
+    v = V[:, i]
+    top_words = find_info_ev(v, words, k=10)
+    print(f"PC {i+1}: {top_words}")
 
+# Also check a few small-eigenvalue eigenvectors
+print("\n--- Last few eigenvectors ---")
+for i in [95, 96, 97, 98, 99]:
+    v = V[:, i]
+    top_words = find_info_ev(v, words, k=10)
+    print(f"PC {i+1}: {top_words}")
 
 
 ##############################################################################
@@ -358,14 +432,20 @@ task_words = read_txt('hw4/analogy_task.txt')
 # Use the 'plot_projections' function to obtain the plot of projections with their corresponding word labels.
 # v) Repeat the previous step for the list of words mentioned in Part 4.2 to generate a second plot. You can use the 
 # 'filename' argument to make sure the 'plot_projections' function does not overwrite the existing file to save the new plot.
-
+w1 = find_embedding('woman', words, E_hat)
+w2 = find_embedding('man',   words, E_hat)
+w = w1 - w2
+w_hat = w / np.linalg.norm(w)
 
 # Part 4.1
 word_seq = np.array(['boy', 'girl', 'brother', 'sister', 'king', 'queen', 'he', 'she','john', 'mary', 'wall', 'tree'])
+proj = get_projections(word_seq, words, E_hat, w_hat)
+plot_projections(word_seq, proj, filename='4.4.1.png')
 
 # Part 4.2
 word_seq = np.array(['math', 'history', 'nurse', 'doctor', 'pilot', 'teacher', 'engineer', 'science', 'arts', 'literature', 'bob', 'alice'])
-
+proj = get_projections(word_seq, words, E_hat, w_hat)
+plot_projections(word_seq, proj, filename='4.4.2.png')
 
 ###########################################################
 # Part 5 (BONUS): Finding answers to analogy questions #
@@ -374,4 +454,9 @@ word_seq = np.array(['math', 'history', 'nurse', 'doctor', 'pilot', 'teacher', '
 # i) Complete the 'find_analog' function.
 # ii) Test it using a set of words for an analogy question, such as the one given in the problem statement.
 # iii) Use the 'check_analogy_task_acc' function to evaluate 'find_analog' on the list of analogy queries in 'task_words'.
+test = find_analog('man', 'woman', 'king', words, E_hat)
+print(f"\nAnalogy test — man:woman :: king:? → {test}")
 
+# Full accuracy evaluation
+acc = check_analogy_task_acc(task_words, words, E_hat)
+print(f"Analogy task accuracy: {acc*100:.2f}%")
