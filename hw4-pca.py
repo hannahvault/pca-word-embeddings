@@ -396,7 +396,7 @@ E_hat = E / row_norms          # (10000, 100)  — final embedding matrix
 # iv-v) Find similar words
 for query in ['learning', 'university', 'california']:
     sim = find_most_sim_word(query, words, E_hat)
-    print(f"Most similar to '{query}': {sim}")
+    print(f"{query}: {sim}")
 
 
 #########################################################################################
