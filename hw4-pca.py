@@ -440,12 +440,12 @@ w_hat = w / np.linalg.norm(w)
 # Part 4.1
 word_seq = np.array(['boy', 'girl', 'brother', 'sister', 'king', 'queen', 'he', 'she','john', 'mary', 'wall', 'tree'])
 proj = get_projections(word_seq, words, E_hat, w_hat)
-plot_projections(word_seq, proj, filename='4.4.1.png')
+plot_projections(word_seq, proj, filename='hw4/4.4.1.png')
 
 # Part 4.2
 word_seq = np.array(['math', 'history', 'nurse', 'doctor', 'pilot', 'teacher', 'engineer', 'science', 'arts', 'literature', 'bob', 'alice'])
 proj = get_projections(word_seq, words, E_hat, w_hat)
-plot_projections(word_seq, proj, filename='4.4.2.png')
+plot_projections(word_seq, proj, filename='hw4/4.4.2.png')
 
 ###########################################################
 # Part 5 (BONUS): Finding answers to analogy questions #
