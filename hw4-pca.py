@@ -352,15 +352,29 @@ task_words = read_txt('hw4/analogy_task.txt') #5585
 # the documentation available at: https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.PCA.html).
 # iv) Get the set of eigenvalues and obtain the plot using the 'plot_evs' function provided above.
 
+# def check(name, X):
+#     print(f"\n==== {name} ====")
+#     print("shape:", X.shape)
+#     print("NaN:", np.isnan(X).any())
+#     print("inf:", np.isinf(X).any())
+#     print("max:", np.max(X))
+#     print("min:", np.min(X))
 # i) log transformation
-M_tilde = np.log(1 + M)
+M_trans = np.log(1 + M)
+# check("M_trans", M_trans)
 
 # ii) centering
-mean_vec = np.mean(M_tilde, axis=0) # (d,) (10000,)
-Mc = M_tilde - mean_vec # (n, d) (10000,10000)
-
+M_mean = np.mean(M_trans, axis=0) # (d,) (10000,)
+# check("M_mean", M_mean)
+Mc = M_trans - M_mean # (n, d) (10000,10000)
+# check("Mc", Mc)
+# print(f"M_trans shape: {M_trans.shape}")
+# print(f"M_mean shape: {M_mean.shape}")
+# print(f"Mc shape: {Mc.shape}")
 # iii) PCA
 pca = PCA(n_components=100)
+# pca = PCA(n_components=100, svd_solver='randomized')
+# pca = PCA(n_components=100, svd_solver='full')  
 pca.fit(Mc)
 
 # iv) eigenvalues 
@@ -385,17 +399,17 @@ V = pca.components_.T   # (10000, 100)
 # ii) P = Mc @ V,  then normalize columns of P
 P = Mc @ V
 col_norms = np.linalg.norm(P, axis=0, keepdims=True)   # (1, 100)
-col_norms[col_norms == 0] = 1
+col_norms = np.where(col_norms == 0, 1, col_norms)
 E = P / col_norms              # normalize each column (PC direction)
 
 # iii) Normalize rows of E to unit l2-norm
 row_norms = np.linalg.norm(E, axis=1, keepdims=True)
-row_norms[row_norms == 0] = 1
-E_hat = E / row_norms          # (10000, 100)  — final embedding matrix
+row_norms = np.where(row_norms == 0, 1, row_norms)
+E_final = E / row_norms          # (10000, 100)  — final embedding matrix
 
 # iv-v) Find similar words
 for query in ['learning', 'university', 'california']:
-    sim = find_most_sim_word(query, words, E_hat)
+    sim = find_most_sim_word(query, words, E_final)
     print(f"{query}: {sim}")
 
 
@@ -407,20 +421,25 @@ for query in ['learning', 'university', 'california']:
 # elements of a given eigenvector.
 # ii) Choose a set of eigenvectors (i.e. columns) from V.
 # iii) For each eigenvector, use the 'find_info_ev' function to see what kind of information it captures. Print the results.
-print("\n--- Eigenvector interpretation ---")
-for i in [0, 1, 2, 3, 4]:   # first 5 eigenvectors
+
+print("\n--- PC interpretation ---\n")
+for i in [0, 1, 2, 3, 4]:
     v = V[:, i]
     top_words = find_info_ev(v, words, k=10)
     print(f"PC {i+1}: {top_words}")
 
-# Also check a few small-eigenvalue eigenvectors
-print("\n--- Last few eigenvectors ---")
+print("\n--- Last few PCs (small eigenvalues) ---\n")
 for i in [95, 96, 97, 98, 99]:
     v = V[:, i]
     top_words = find_info_ev(v, words, k=10)
     print(f"PC {i+1}: {top_words}")
 
-
+# print("V NaN:", np.isnan(pca.components_).any())
+# print("V inf:", np.isinf(pca.components_).any())
+# print("P NaN:", np.isnan(P).any())
+# print("P inf:", np.isinf(P).any())
+# print("E NaN:", np.isnan(E_final).any())
+# print("E inf:", np.isinf(E_final).any())
 ##############################################################################
 # Part 4: Exploring Semantic/Syntactic Concepts Captured by Word Embeddings #
 ##############################################################################
@@ -432,19 +451,19 @@ for i in [95, 96, 97, 98, 99]:
 # Use the 'plot_projections' function to obtain the plot of projections with their corresponding word labels.
 # v) Repeat the previous step for the list of words mentioned in Part 4.2 to generate a second plot. You can use the 
 # 'filename' argument to make sure the 'plot_projections' function does not overwrite the existing file to save the new plot.
-w1 = find_embedding('woman', words, E_hat)
-w2 = find_embedding('man',   words, E_hat)
+w1 = find_embedding('woman', words, E_final)
+w2 = find_embedding('man',   words, E_final)
 w = w1 - w2
 w_hat = w / np.linalg.norm(w)
 
 # Part 4.1
 word_seq = np.array(['boy', 'girl', 'brother', 'sister', 'king', 'queen', 'he', 'she','john', 'mary', 'wall', 'tree'])
-proj = get_projections(word_seq, words, E_hat, w_hat)
+proj = get_projections(word_seq, words, E_final, w_hat)
 plot_projections(word_seq, proj, filename='hw4/4.4.1.png')
 
 # Part 4.2
 word_seq = np.array(['math', 'history', 'nurse', 'doctor', 'pilot', 'teacher', 'engineer', 'science', 'arts', 'literature', 'bob', 'alice'])
-proj = get_projections(word_seq, words, E_hat, w_hat)
+proj = get_projections(word_seq, words, E_final, w_hat)
 plot_projections(word_seq, proj, filename='hw4/4.4.2.png')
 
 ###########################################################
@@ -454,9 +473,29 @@ plot_projections(word_seq, proj, filename='hw4/4.4.2.png')
 # i) Complete the 'find_analog' function.
 # ii) Test it using a set of words for an analogy question, such as the one given in the problem statement.
 # iii) Use the 'check_analogy_task_acc' function to evaluate 'find_analog' on the list of analogy queries in 'task_words'.
-test = find_analog('man', 'woman', 'king', words, E_hat)
-print(f"\nAnalogy test — man:woman :: king:? → {test}")
 
-# Full accuracy evaluation
-acc = check_analogy_task_acc(task_words, words, E_hat)
-print(f"Analogy task accuracy: {acc*100:.2f}%")
+# check_analogy_task_acc
+acc = check_analogy_task_acc(task_words, words, E_final)
+print(f"Analogy Task Accuracy: {acc * 100:.2f}%")
+
+# find_analog
+correct_ex, wrong_ex = [], []
+for line in task_words:
+    parts = line.split()
+    if len(parts) != 4:
+        continue
+    wd1, wd2, wd3, wd4 = parts
+    pred = find_analog(wd1, wd2, wd3, words, E_final)
+    
+    if pred == wd4:#correct
+        correct_ex.append((wd1, wd2, wd3, wd4, pred))
+    else:#wrong
+        wrong_ex.append((wd1, wd2, wd3, wd4, pred))
+
+print("\nCorrect examples (top 5):")
+for ex in correct_ex[:5]:
+    print(f"  {ex[0]}:{ex[1]} :: {ex[2]}:{ex[3]} → {ex[4]}")
+
+print("\nWrong examples (top 5):")
+for ex in wrong_ex[:5]:
+    print(f"  {ex[0]}:{ex[1]} :: {ex[2]}:{ex[3]} → {ex[4]}")
