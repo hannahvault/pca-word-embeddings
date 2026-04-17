@@ -227,11 +227,10 @@ def get_projections(word_seq, words, E, w):
   #     - Find the projection of this embedding onto 'w', i.e. the dot product with normalized 'w'. 
   # ii) Return the set of projections. 
   ###############################################################################################################  
-  w_norm = w / np.linalg.norm(w)          # unit vector
   proj_seq = []
   for word in word_seq:
       emb = find_embedding(word, words, E)
-      proj = np.dot(emb, w_norm)
+      proj = np.dot(emb, w)
       proj_seq.append(proj)
   proj_seq = np.array(proj_seq) 
   return proj_seq
